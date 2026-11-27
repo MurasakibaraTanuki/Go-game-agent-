@@ -66,6 +66,8 @@ final class PositionAnalysis implements AutoCloseable {
             JSONObject response=new JSONObject(line);
             if(!id.equals(response.optString("id")))throw new IOException("Неожиданный ответ KataGo");
             if(response.has("error"))throw new IOException(response.optString("error"));
+            // Fail closed on warnings: KataGo may otherwise silently change rules or settings.
+            if(response.has("warning"))throw new IOException("Предупреждение KataGo: "+response.optString("warning"));
             if(response.optBoolean("isDuringSearch")||response.getInt("turnNumber")!=turn||
                 !player.equals(response.getJSONObject("rootInfo").getString("currentPlayer")))
                 throw new IOException("Ответ не соответствует позиции");
