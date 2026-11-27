@@ -18,6 +18,9 @@ mkdir -p "$work/tests"
 javac -encoding UTF-8 --release 8 -d "$work/tests" \
   android/src/org/gomasters/mobile/GameRecord.java android/tests/GameRecordTest.java
 java -cp "$work/tests" org.gomasters.mobile.GameRecordTest
+javac -encoding UTF-8 --release 8 -d "$work/tests" \
+  android/src/org/gomasters/mobile/CoachText.java android/tests/CoachTextTest.java
+java -cp "$work/tests" org.gomasters.mobile.CoachTextTest
 cp external/native/katago-android/arm64-v8a/libkatago.so "$work/lib/arm64-v8a/"
 if [[ -f external/native/katago-android/x86_64/libkatago.so ]]; then
   mkdir -p "$work/lib/x86_64"; cp external/native/katago-android/x86_64/libkatago.so "$work/lib/x86_64/"
@@ -35,6 +38,7 @@ for spec in play.MODELS:
     copyfile(source, Path(sys.argv[1]) / source.name)
 PY
 cp configs/gtp-cpu.cfg "$work/assets/game.cfg"
+cp android/analysis.cfg "$work/assets/analysis.cfg"
 cp android/licenses/* "$work/assets/notices/"
 cp external/masame/src-tauri/resources/licenses/katago/* "$work/assets/notices/"
 cp external/masame/src-tauri/resources/licenses/linux-engine/eigen-MPL-2.0.txt "$work/assets/notices/"
