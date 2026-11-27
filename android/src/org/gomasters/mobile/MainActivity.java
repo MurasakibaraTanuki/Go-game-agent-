@@ -295,6 +295,20 @@ public final class MainActivity extends Activity {
         explanation.setText("KataGo анализирует позицию…");
         ScrollView scroll=new ScrollView(this);scroll.addView(explanation);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,dp(136)));
+        TextView legend=new TextView(this);legend.setTextSize(13);legend.setGravity(Gravity.CENTER);
+        legend.setPadding(dp(8),dp(4),dp(8),dp(4));legend.setVisibility(View.GONE);root.addView(legend);
+        LinearLayout layers=new LinearLayout(this);
+        Button map=reviewButton(layers,"Карта"), weak=reviewButton(layers,"Атари"),
+            lines=reviewButton(layers,"Варианты");
+        root.addView(layers);
+        map.setEnabled(false);lines.setEnabled(false);
+        BoardInsights.Atari facts=BoardInsights.atari(position);
+        weak.setOnClickListener(v->{
+            boolean enable=preview.atari==null;
+            preview.ownership=null;preview.atari=enable?facts:null;
+            legend.setText(facts.summary());legend.setVisibility(enable?View.VISIBLE:View.GONE);
+            preview.invalidate();
+        });
         Button close=new Button(this);close.setText("Закрыть");root.addView(close);
         close.setOnClickListener(v->panel.dismiss());
         panel.setOnDismissListener(d->{task.close();if(analysis==task)analysis=null;});
@@ -309,6 +323,15 @@ public final class MainActivity extends Activity {
                 ui.post(()->{
                     if(analysis!=task||!panel.isShowing())return;
                     preview.recommendation=result.best.point;preview.invalidate();
+                    map.setEnabled(true);
+                    map.setOnClickListener(v->{
+                        boolean enable=preview.ownership==null;
+                        preview.atari=null;preview.ownership=enable?result.ownership:null;
+                        legend.setText("Прогноз владения в конце игры: тёмное — чёрные, светлое — белые. Бледное — неопределённость.");
+                        legend.setVisibility(enable?View.VISIBLE:View.GONE);preview.invalidate();
+                    });
+                    lines.setEnabled(!result.variations.isEmpty());
+                    lines.setOnClickListener(v->chooseVariation(record,turn,result.variations));
                     explanation.setText(advice+"\n\nЗелёное кольцо: рекомендация. Синее: сыгранный ход.");
                 });
             } catch(Exception ex) {
@@ -317,6 +340,56 @@ public final class MainActivity extends Activity {
                 });
             } finally {task.close();}
         });
+    }
+
+    private void chooseVariation(GameRecord record,int turn,List<PositionAnalysis.Variation> variations) {
+        String[] labels=new String[variations.size()];
+        for(int i=0;i<labels.length;i++) {
+            PositionAnalysis.Variation line=variations.get(i);
+            labels[i]=(i+1)+". "+CoachText.vertex(line.candidate.point)+" · "+line.moves.size()+" ходов"+
+                (line.candidate.visits<12?" · мало расчёта":"");
+        }
+        new AlertDialog.Builder(this).setTitle("Возможные продолжения KataGo")
+            .setItems(labels,(d,i)->variation(record,turn,variations.get(i))).setNegativeButton("Отмена",null).show();
+    }
+
+    private void variation(GameRecord record,int turn,PositionAnalysis.Variation line) {
+        final GameRecord hypothetical;
+        try {hypothetical=record.variation(turn,line.moves);}
+        catch(IllegalArgumentException ex){
+            Toast.makeText(this,"Не удалось воспроизвести вариант",Toast.LENGTH_LONG).show();return;
+        }
+        Dialog dialog=new Dialog(this,android.R.style.Theme_Material_NoActionBar);
+        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(0xff21221e);
+        TextView title=new TextView(this);title.setGravity(Gravity.CENTER);title.setTextSize(17);
+        title.setMinHeight(dp(48));root.addView(title);
+        Goban replay=new Goban(this,p->{});
+        root.addView(replay,new LinearLayout.LayoutParams(-1,0,1));
+        TextView note=new TextView(this);note.setGravity(Gravity.CENTER);
+        note.setText("Пример продолжения, не вынужденная последовательность.");root.addView(note);
+        SeekBar slider=new SeekBar(this);slider.setMax(line.moves.size());root.addView(slider);
+        LinearLayout controls=new LinearLayout(this);
+        Button prev=reviewButton(controls,"◀"),next=reviewButton(controls,"▶"),close=reviewButton(controls,"Закрыть");
+        root.addView(controls);
+        java.util.function.IntConsumer show=step->{
+            int ply=turn+step;
+            replay.stones=hypothetical.position(ply);replay.last=hypothetical.last(ply);
+            replay.moveCount=ply;replay.describe();replay.invalidate();
+            title.setText(step+" / "+line.moves.size()+" · "+(step==0?"Исходная позиция":
+                (((ply&1)==1?"Чёрные: ":"Белые: ")+CoachText.vertex(replay.last))));
+            prev.setEnabled(step>0);next.setEnabled(step<line.moves.size());
+        };
+        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            public void onProgressChanged(SeekBar b,int p,boolean user){show.accept(p);}
+            public void onStartTrackingTouch(SeekBar b){}
+            public void onStopTrackingTouch(SeekBar b){}
+        });
+        prev.setOnClickListener(v->slider.setProgress(Math.max(0,slider.getProgress()-1)));
+        next.setOnClickListener(v->slider.setProgress(Math.min(line.moves.size(),slider.getProgress()+1)));
+        close.setOnClickListener(v->dialog.dismiss());
+        show.accept(0);dialog.setContentView(root);dialog.show();
+        if(dialog.getWindow()!=null)dialog.getWindow().setLayout(-1,-1);
     }
 
     private Button reviewButton(LinearLayout row,String label) {
