@@ -21,6 +21,9 @@ java -cp "$work/tests" org.gomasters.mobile.GameRecordTest
 javac -encoding UTF-8 --release 8 -d "$work/tests" \
   android/src/org/gomasters/mobile/CoachText.java android/tests/CoachTextTest.java
 java -cp "$work/tests" org.gomasters.mobile.CoachTextTest
+javac -encoding UTF-8 --release 8 -d "$work/tests" \
+  android/src/org/gomasters/mobile/BoardInsights.java android/tests/BoardInsightsTest.java
+java -cp "$work/tests" org.gomasters.mobile.BoardInsightsTest
 cp external/native/katago-android/arm64-v8a/libkatago.so "$work/lib/arm64-v8a/"
 if [[ -f external/native/katago-android/x86_64/libkatago.so ]]; then
   mkdir -p "$work/lib/x86_64"; cp external/native/katago-android/x86_64/libkatago.so "$work/lib/x86_64/"
