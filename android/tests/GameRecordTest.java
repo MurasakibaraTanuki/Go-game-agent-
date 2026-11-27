@@ -37,6 +37,12 @@ public final class GameRecordTest {
         check(original.position(3)[0]=='.',"played record remains unchanged");
         check(Arrays.equals(original.position(2),alternative.position(2)),"variation root identical");
         check(original.variation(0,Arrays.asList(361)).last(1)==361,"variation pass from empty board");
+        check(edges.sgf("W+R").contains("RE[W+R]"),"white wins by resignation");
+        check(edges.sgf("B+R").contains("RE[B+R]"),"black wins by resignation");
+        check(!edges.sgf().contains("RE["),"no fabricated result");
+        boolean invalidResult=false;
+        try {edges.sgf("B+1");} catch(IllegalArgumentException ex) {invalidResult=true;}
+        check(invalidResult,"reject unsupported result");
         System.out.println("GameRecord tests passed");
     }
 }
