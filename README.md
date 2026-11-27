@@ -1,6 +1,8 @@
 # Go Masters AI
 
-Offline-first Go training and play. The first playable desktop prototype uses KataGo Human SL on a 19×19 board. It includes a Russian interface and a choice of opponent rank. Individual master profiles and Android play are under development.
+Offline-first Go training and play. Android is the primary play platform. The Android preview bundles KataGo and both neural networks for offline 19×19 games. First tap to zoom, then confirm the selected intersection. Desktop remains a reference client for engine and profile development.
+
+[Android instructions (RU)](android/README.ru.md) · [Android APK builds](https://github.com/MurasakibaraTanuki/Go-game-agent-/actions/workflows/android.yml)
 
 ## Play on desktop
 

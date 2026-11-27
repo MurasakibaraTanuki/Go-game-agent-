@@ -41,14 +41,35 @@ jobs:
           fi
           export MASAME_VENDOR="$PWD/external/native"
           bash external/masame/scripts/build-katago-android.sh
+      - uses: actions/cache@v4
+        id: emulator-engine
+        with:
+          path: external/native/katago-android/x86_64/libkatago.so
+          key: katago-x86-emulator-${{ hashFiles('android/native-x86.sh') }}
+      - name: Build the emulator ABI
+        if: steps.emulator-engine.outputs.cache-hit != 'true'
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION" >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y libeigen3-dev
+          bash android/native-x86.sh
       - name: Assemble and verify the offline APK
-        if: hashFiles('android/build.sh') != ''
         run: bash android/build.sh
       - uses: actions/upload-artifact@v4
-        if: hashFiles('android/out/GoMasters-Android-arm64.apk') != ''
         with:
-          name: GoMasters-Android-arm64
+          name: GoMasters-Android
           path: |
-            android/out/GoMasters-Android-arm64.apk
+            android/out/GoMasters-Android.apk
             android/out/SHA256SUMS
           if-no-files-found: error
+      - name: Enable emulator acceleration
+        run: sudo chmod 666 /dev/kvm
+      - name: Install and play in an offline Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          ram-size: 3072M
+          disk-size: 4000M
+          disable-animations: true
+          script: python3 android/tests/device.py
