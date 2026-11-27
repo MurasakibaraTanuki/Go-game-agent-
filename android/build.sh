@@ -13,6 +13,11 @@ out="$root/android/out"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$out" "$work"/{assets/notices,classes,dex,lib/arm64-v8a}
+# Fast JVM regression test; no Android runtime or neural models required.
+mkdir -p "$work/tests"
+javac -encoding UTF-8 --release 8 -d "$work/tests" \
+  android/src/org/gomasters/mobile/GameRecord.java android/tests/GameRecordTest.java
+java -cp "$work/tests" org.gomasters.mobile.GameRecordTest
 cp external/native/katago-android/arm64-v8a/libkatago.so "$work/lib/arm64-v8a/"
 if [[ -f external/native/katago-android/x86_64/libkatago.so ]]; then
   mkdir -p "$work/lib/x86_64"; cp external/native/katago-android/x86_64/libkatago.so "$work/lib/x86_64/"
