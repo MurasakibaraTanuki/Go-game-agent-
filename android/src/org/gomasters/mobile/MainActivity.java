@@ -26,6 +26,8 @@ public final class MainActivity extends Activity {
     private int ticking = -1;
     private long since;
     private String rank;
+    private static final int EXPORT_SGF = 41;
+    private String pendingSgf;
     private final Runnable ticker = new Runnable() {
         public void run() { renderTime(); ui.postDelayed(this, 250); }
     };
@@ -33,6 +35,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         prefs=getSharedPreferences("game",MODE_PRIVATE);
+        pendingSgf=state==null?null:state.getString("pendingSgf");
         LinearLayout layout=new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setBackgroundColor(0xff21221e);
@@ -199,15 +202,104 @@ public final class MainActivity extends Activity {
     }
 
     private void menu() {
-        String[] items={"Пас","Новая партия","Ввод и отображение",focus?"Выйти из фокуса":"Режим фокуса","Отменить выбор / вся доска"};
+        String[] items={"Пас","Новая партия","Ввод и отображение",focus?"Выйти из фокуса":"Режим фокуса","Отменить выбор / вся доска","Просмотр партии / SGF"};
         new AlertDialog.Builder(this).setItems(items,(dialog,i)->{
             if(i==0) human(361);
             if(i==1) newGameDialog();
             if(i==2) settings();
             if(i==3) {focus=!focus; prefs.edit().putBoolean("focus",focus).apply();setFocus();}
             if(i==4) board.cancelSelection();
+            if(i==5) review();
         }).show();
     }
+    private void review() {
+        final GameRecord record;
+        try { record=new GameRecord(moves); }
+        catch(IllegalArgumentException ex) {
+            Toast.makeText(this,"Ошибка записи: "+ex.getMessage(),Toast.LENGTH_LONG).show(); return;
+        }
+        final Dialog dialog=new Dialog(this,android.R.style.Theme_Material_NoActionBar);
+        LinearLayout root=new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(0xff21221e);
+        TextView heading=new TextView(this);
+        heading.setGravity(Gravity.CENTER); heading.setTextSize(18); heading.setMinHeight(dp(48));
+        root.addView(heading);
+        Goban replay=new Goban(this,p->{});
+        root.addView(replay,new LinearLayout.LayoutParams(-1,0,1));
+        SeekBar slider=new SeekBar(this);
+        slider.setMax(record.size()); slider.setEnabled(record.size()>0);
+        root.addView(slider,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout nav=new LinearLayout(this);
+        Button first=reviewButton(nav,"|◀"), prev=reviewButton(nav,"◀"), next=reviewButton(nav,"▶"), last=reviewButton(nav,"▶|");
+        first.setContentDescription("Начало партии"); prev.setContentDescription("Предыдущий ход");
+        next.setContentDescription("Следующий ход"); last.setContentDescription("Последний ход");
+        root.addView(nav);
+        LinearLayout actions=new LinearLayout(this);
+        Button export=reviewButton(actions,"SGF"), close=reviewButton(actions,"Закрыть");
+        root.addView(actions);
+        java.util.function.IntConsumer show=ply->{
+            replay.stones=record.position(ply); replay.last=record.last(ply);
+            replay.moveCount=ply; replay.describe(); replay.invalidate();
+            String move=ply==0?"Начальная позиция":
+                (((ply&1)==1?"Чёрные: ":"Белые: ")+(replay.last==GameRecord.PASS?"пас":GoEngine.vertex(replay.last)));
+            heading.setText(ply+" / "+record.size()+"  ·  "+move);
+            first.setEnabled(ply>0); prev.setEnabled(ply>0);
+            next.setEnabled(ply<record.size()); last.setEnabled(ply<record.size());
+        };
+        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar b,int p,boolean user) { show.accept(p); }
+            public void onStartTrackingTouch(SeekBar b) {}
+            public void onStopTrackingTouch(SeekBar b) {}
+        });
+        first.setOnClickListener(v->slider.setProgress(0));
+        prev.setOnClickListener(v->slider.setProgress(Math.max(0,slider.getProgress()-1)));
+        next.setOnClickListener(v->slider.setProgress(Math.min(record.size(),slider.getProgress()+1)));
+        last.setOnClickListener(v->slider.setProgress(record.size()));
+        export.setOnClickListener(v->exportSgf(record.sgf()));
+        close.setOnClickListener(v->dialog.dismiss());
+        slider.setProgress(record.size()); show.accept(record.size());
+        dialog.setContentView(root); dialog.show();
+        if(dialog.getWindow()!=null) dialog.getWindow().setLayout(-1,-1);
+    }
+
+    private Button reviewButton(LinearLayout row,String label) {
+        Button b=new Button(this); b.setText(label); b.setMinWidth(0);
+        row.addView(b,new LinearLayout.LayoutParams(0,-2,1)); return b;
+    }
+
+    private void exportSgf(String sgf) {
+        pendingSgf=sgf;
+        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/x-go-sgf");
+        intent.putExtra(Intent.EXTRA_TITLE,"GoMasters.sgf");
+        try { startActivityForResult(intent,EXPORT_SGF); }
+        catch(ActivityNotFoundException ex) {
+            pendingSgf=null;
+            Toast.makeText(this,"Нет приложения для сохранения файла",Toast.LENGTH_LONG).show();
+        }
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state);
+        state.putString("pendingSgf",pendingSgf);
+    }
+
+    @Override protected void onActivityResult(int request,int result,Intent data) {
+        super.onActivityResult(request,result,data);
+        if(request!=EXPORT_SGF) return;
+        String sgf=pendingSgf; pendingSgf=null;
+        if(result!=RESULT_OK || data==null || data.getData()==null || sgf==null) return;
+        try(OutputStream out=getContentResolver().openOutputStream(data.getData(),"wt")) {
+            if(out==null) throw new IOException("Нет потока записи");
+            out.write(sgf.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            Toast.makeText(this,"SGF сохранён",Toast.LENGTH_SHORT).show();
+        } catch(IOException|SecurityException ex) {
+            Toast.makeText(this,"Не удалось сохранить SGF: "+ex.getMessage(),Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void settings() {
         boolean[] values={board.precision,board.autoOut,prefs.getBoolean("pace",true)};
         new AlertDialog.Builder(this).setTitle("Ввод и отображение").setMultiChoiceItems(
