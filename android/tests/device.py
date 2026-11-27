@@ -40,7 +40,7 @@ def label(text, timeout=100):
 
 
 def exact(text, timeout=100):
-    return wait_for(lambda n: text == n.get("text", ""), timeout=timeout)
+    return wait_for(lambda n: text.casefold() == n.get("text", "").casefold(), timeout=timeout)
 
 
 def menu(text):
@@ -99,7 +99,7 @@ def main():
         center(exact("Отмена"))
         label("Ваш ход")
         menu("Сдаться")
-        center(wait_for(lambda n: n.get("text")=="Сдаться" and n.get("clickable")=="true"))
+        center(wait_for(lambda n: n.get("text","").casefold()=="сдаться" and n.get("clickable")=="true"))
         label("Партия завершена: вы сдались")
         adb("shell","am","force-stop",PACKAGE)
         adb("shell","am","start","-W","-n",PACKAGE+"/.MainActivity")
