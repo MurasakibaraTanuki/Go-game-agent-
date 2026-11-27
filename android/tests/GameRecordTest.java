@@ -18,7 +18,7 @@ public final class GameRecordTest {
         check(white.position(4)[0]=='.',"white captures black");
         check(Arrays.equals(white.position(2),white.position(3)),"pass leaves board unchanged");
         GameRecord edges=record(0,360,361,361);
-        check(edges.sgf().equals("(;GM[1]FF[4]CA[UTF-8]AP[Go Masters]SZ[19]RU[Chinese]KM[7.5];B[aa];W[ss];B[];W[])\n"),"SGF orientation and passes");
+        check(edges.sgf().equals("(;GM[1]FF[4]CA[UTF-8]AP[Go Masters:0.1]SZ[19]RU[Chinese]KM[7.5];B[aa];W[ss];B[];W[])\n"),"SGF orientation and passes");
         check(edges.last(0)==-1 && edges.last(4)==361 && edges.size()==4,"navigation bounds");
         char[] copy=edges.position(1); copy[0]='O';
         check(edges.position(1)[0]=='X',"immutable snapshots");
