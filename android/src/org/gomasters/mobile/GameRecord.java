@@ -33,6 +33,14 @@ final class GameRecord {
         }
     }
 
+    /** Separate hypothetical record; the played game remains immutable. */
+    GameRecord variation(int turn,List<Integer> continuation) {
+        if(turn<0||turn>size())throw new IllegalArgumentException("Invalid variation root");
+        List<Integer> branch=new ArrayList<>(moves.subList(0,turn));
+        branch.addAll(continuation);
+        return new GameRecord(branch);
+    }
+
     int size() { return moves.size(); }
     int last(int ply) { return ply == 0 ? -1 : moves.get(ply - 1); }
     char[] position(int ply) { return positions.get(ply).clone(); }
