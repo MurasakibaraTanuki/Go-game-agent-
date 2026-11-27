@@ -2,16 +2,39 @@ name: Android APK
 on:
   workflow_dispatch:
   push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'configs/gtp-cpu.cfg'
+      - '.github/workflows/android.yml'
+  pull_request:
     paths:
       - 'android/**'
       - 'configs/gtp-cpu.cfg'
       - '.github/workflows/android.yml'
 permissions:
   contents: read
+concurrency:
+  group: android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
-  android:
+  preflight:
     runs-on: ubuntu-24.04
-    timeout-minutes: 55
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Test Java logic and compile Android sources before native build
+        run: bash android/tests/preflight.sh
+  android:
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
     env:
       MASAME_REV: 1915ecad68b0c8648fcd1b4b28228464d8454863
       NDK_VERSION: 27.2.12479018
@@ -54,13 +77,6 @@ jobs:
           bash android/native-x86.sh
       - name: Assemble and verify the offline APK
         run: bash android/build.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: GoMasters-Android
-          path: |
-            android/out/GoMasters-Android.apk
-            android/out/SHA256SUMS
-          if-no-files-found: error
       - name: Enable emulator acceleration
         run: sudo chmod 666 /dev/kvm
       - name: Install and play in an offline Android emulator
@@ -73,3 +89,19 @@ jobs:
           disk-size: 4000M
           disable-animations: true
           script: python3 android/tests/device.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GoMasters-Android
+          path: |
+            android/out/GoMasters-Android.apk
+            android/out/SHA256SUMS
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: Android-test-diagnostics
+          path: |
+            android/out/device-logcat.txt
+            android/out/device-ui.xml
+            android/out/device-screen.png
+          if-no-files-found: ignore
