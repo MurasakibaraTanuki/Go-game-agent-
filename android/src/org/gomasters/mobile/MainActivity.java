@@ -28,6 +28,8 @@ public final class MainActivity extends Activity {
     private String rank;
     private static final int EXPORT_SGF = 41;
     private String pendingSgf;
+    private boolean gameOver;
+    private PositionAnalysis analysis;
     private final Runnable ticker = new Runnable() {
         public void run() { renderTime(); ui.postDelayed(this, 250); }
     };
@@ -130,6 +132,7 @@ public final class MainActivity extends Activity {
     }
 
     private void start() {
+        gameOver=false;
         stopEngine(); int id=epoch;
         board.active=false; board.moveCount=0; board.last=-1; board.resetCamera(); Arrays.fill(board.stones,'.');
         turnClock(-1); message("Загрузка KataGo…");
@@ -158,6 +161,7 @@ public final class MainActivity extends Activity {
     private void nextTurn(String result) {
         if(result!=null) {
             board.active=false; turnClock(-1); save();
+            gameOver=true; stopEngine();
             if(focus) {focus=false;setFocus();}
             message("Оценка KataGo: "+result); return;
         }
@@ -236,7 +240,10 @@ public final class MainActivity extends Activity {
         next.setContentDescription("Следующий ход"); last.setContentDescription("Последний ход");
         root.addView(nav);
         LinearLayout actions=new LinearLayout(this);
-        Button export=reviewButton(actions,"SGF"), close=reviewButton(actions,"Закрыть");
+        Button coach=reviewButton(actions,"Разбор"), export=reviewButton(actions,"SGF"), close=reviewButton(actions,"Закрыть");
+        final boolean canAnalyze=gameOver;
+        coach.setEnabled(canAnalyze);
+        if(!canAnalyze) coach.setContentDescription("Разбор доступен после завершения партии");
         root.addView(actions);
         java.util.function.IntConsumer show=ply->{
             replay.stones=record.position(ply); replay.last=record.last(ply);
@@ -256,11 +263,60 @@ public final class MainActivity extends Activity {
         prev.setOnClickListener(v->slider.setProgress(Math.max(0,slider.getProgress()-1)));
         next.setOnClickListener(v->slider.setProgress(Math.min(record.size(),slider.getProgress()+1)));
         last.setOnClickListener(v->slider.setProgress(record.size()));
+        coach.setOnClickListener(v->coach(record,slider.getProgress()));
         export.setOnClickListener(v->exportSgf(record.sgf()));
         close.setOnClickListener(v->dialog.dismiss());
         slider.setProgress(record.size()); show.accept(record.size());
         dialog.setContentView(root); dialog.show();
         if(dialog.getWindow()!=null) dialog.getWindow().setLayout(-1,-1);
+    }
+
+    private void coach(GameRecord record,int selected) {
+        if(!gameOver || analysis!=null)return;
+        // Review shows the board AFTER a move; analysis uses its preceding position.
+        final int turn=Math.max(0,selected-1);
+        final int played=selected==0?-1:record.last(selected);
+        final char[] position=record.position(turn);
+        final PositionAnalysis task=new PositionAnalysis();
+        analysis=task;
+        Dialog panel=new Dialog(this,android.R.style.Theme_Material_NoActionBar);
+        LinearLayout root=new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);root.setBackgroundColor(0xff21221e);
+        TextView header=new TextView(this);header.setGravity(Gravity.CENTER);header.setTextSize(17);
+        header.setPadding(dp(12),dp(8),dp(12),dp(8));
+        header.setText(selected==0?"Начальная позиция":"Перед ходом "+selected+" · "+CoachText.vertex(played));
+        root.addView(header);
+        Goban preview=new Goban(this,p->{});
+        preview.stones=position; preview.moveCount=turn; preview.last=record.last(turn);
+        preview.playedSuggestion=played; preview.describe();
+        root.addView(preview,new LinearLayout.LayoutParams(-1,0,1));
+        TextView explanation=new TextView(this);explanation.setTextSize(16);
+        explanation.setPadding(dp(16),dp(10),dp(16),dp(10));
+        explanation.setText("KataGo анализирует позицию…");
+        ScrollView scroll=new ScrollView(this);scroll.addView(explanation);
+        root.addView(scroll,new LinearLayout.LayoutParams(-1,dp(136)));
+        Button close=new Button(this);close.setText("Закрыть");root.addView(close);
+        close.setOnClickListener(v->panel.dismiss());
+        panel.setOnDismissListener(d->{task.close();if(analysis==task)analysis=null;});
+        panel.setContentView(root);panel.show();
+        if(panel.getWindow()!=null)panel.getWindow().setLayout(-1,-1);
+        worker.execute(()->{
+            try {
+                PositionAnalysis.Result result=task.run(
+                    new File(getApplicationInfo().nativeLibraryDir,"libkatago.so"),getFilesDir(),
+                    asset("analysis.cfg"),asset(MAIN),record,turn,played);
+                String advice=CoachText.describe(position,(turn&1)==0,result.best,result.played,played);
+                ui.post(()->{
+                    if(analysis!=task||!panel.isShowing())return;
+                    preview.recommendation=result.best.point;preview.invalidate();
+                    explanation.setText(advice+"\n\nЗелёное кольцо: рекомендация. Синее: сыгранный ход.");
+                });
+            } catch(Exception ex) {
+                ui.post(()->{
+                    if(analysis==task&&panel.isShowing()) explanation.setText("Разбор недоступен: "+ex.getMessage());
+                });
+            } finally {task.close();}
+        });
     }
 
     private Button reviewButton(LinearLayout row,String label) {
@@ -328,6 +384,7 @@ public final class MainActivity extends Activity {
         super.onBackPressed();
     }
     @Override protected void onDestroy() {
+        if(analysis!=null){analysis.close();analysis=null;}
         stopEngine(); worker.shutdownNow(); ui.removeCallbacksAndMessages(null); super.onDestroy();
     }
 }
