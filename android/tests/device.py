@@ -35,8 +35,17 @@ def board(fragment):
     return wait_for(lambda n: n.get("content-desc", "").startswith("Доска го") and fragment in n.get("content-desc"))
 
 
-def label(text):
-    return wait_for(lambda n: text in n.get("text", ""))
+def label(text, timeout=100):
+    return wait_for(lambda n: text in n.get("text", ""), timeout=timeout)
+
+
+def exact(text, timeout=100):
+    return wait_for(lambda n: text == n.get("text", ""), timeout=timeout)
+
+
+def menu(text):
+    center(wait_for(lambda n: n.get("content-desc")=="Часы и меню партии"))
+    center(exact(text))
 
 
 def bounds(node):
@@ -85,7 +94,47 @@ def main():
         adb("shell","am","force-stop",PACKAGE)
         launch()
         board("Ходов: 2.")
-        print("Passed offline cold start, touch preview, adjustment, confirmation, real Human SL reply, focus and restore.")
+        print("Passed offline cold start, touch preview, adjustment, confirmation, real Human SL reply, focus and restore.", flush=True)
+        menu("Сдаться")
+        center(exact("Отмена"))
+        label("Ваш ход")
+        menu("Сдаться")
+        center(wait_for(lambda n: n.get("text")=="Сдаться" and n.get("clickable")=="true"))
+        label("Партия завершена: вы сдались")
+        adb("shell","am","force-stop",PACKAGE)
+        adb("shell","am","start","-W","-n",PACKAGE+"/.MainActivity")
+        label("Партия завершена: вы сдались")
+        board("Ходов: 2.")
+        menu("Просмотр партии / SGF")
+        center(wait_for(lambda n:n.get("content-desc")=="Предыдущий ход"))
+        board("Ходов: 1.")
+        center(exact("Разбор"))
+        # A real query for the position before move one, not mocked output.
+        label("Перед ходом 1")
+        label("KataGo предлагает",timeout=390)
+        center(exact("Карта"))
+        label("Прогноз владения")
+        center(exact("Атари"))
+        label("Групп с одним дыханием нет")
+        center(exact("Варианты"))
+        label("Возможные продолжения KataGo")
+        center(wait_for(lambda n:n.get("text","").startswith("1. ") and "ходов" in n.get("text","")))
+        label("Исходная позиция")
+        center(exact("▶"))
+        label("1 /")
+        board("Ходов: 1.")
+        center(exact("Закрыть"))
+        center(exact("Закрыть"))
+        center(exact("Закрыть"))
+        label("Партия завершена: вы сдались")
+        print("Passed resignation, restore, move review, native KataGo analysis, ownership, atari and variation navigation.",flush=True)
+    except Exception:
+        Path("android/out").mkdir(parents=True,exist_ok=True)
+        Path("android/out/device-logcat.txt").write_text(adb("logcat","-d","-t","1500",check=False))
+        Path("android/out/device-ui.xml").write_text(adb("shell","cat","/sdcard/go-window.xml",check=False))
+        with open("android/out/device-screen.png","wb") as file:
+            subprocess.run(["adb","exec-out","screencap","-p"],stdout=file,check=False)
+        raise
     finally:
         adb("shell", "cmd", "connectivity", "airplane-mode", "disable", check=False)
 
