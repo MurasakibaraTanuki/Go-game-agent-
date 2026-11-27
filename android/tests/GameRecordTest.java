@@ -31,6 +31,12 @@ public final class GameRecordTest {
             try {record(invalid);} catch(IllegalArgumentException ex) {rejected=true;}
             check(rejected,"invalid history rejected");
         }
+        GameRecord original=record(1,0,19,360);
+        GameRecord alternative=original.variation(2,Arrays.asList(20,360));
+        check(alternative.size()==4 && alternative.position(3)[0]=='O',"alternate avoids original capture");
+        check(original.position(3)[0]=='.',"played record remains unchanged");
+        check(Arrays.equals(original.position(2),alternative.position(2)),"variation root identical");
+        check(original.variation(0,Arrays.asList(361)).last(1)==361,"variation pass from empty board");
         System.out.println("GameRecord tests passed");
     }
 }
