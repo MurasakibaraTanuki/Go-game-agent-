@@ -1,6 +1,27 @@
 # Go Masters AI
 
-Offline-first Go training and play with independently configurable opponent style and strength. Initial project scaffold, not a finished application. See [Russian project brief](docs/PLAN.ru.md), [architecture](docs/ARCHITECTURE.md), [data and research](docs/SOURCES.md) and [validation](docs/VALIDATION.md).
+Offline-first Go training and play. The first playable desktop prototype uses KataGo Human SL on a 19×19 board. It includes a Russian interface and a choice of opponent rank. Individual master profiles and Android play are under development.
+
+## Play on desktop
+
+Windows x64 or Debian-compatible Linux x64, AVX2/FMA CPU, Python 3.10+ with Tk. On Linux, the setup also uses `dpkg-deb`. Open a terminal in the repository and run:
+
+```sh
+python scripts/play.py --setup
+python scripts/play.py
+```
+
+On Windows the Python launcher also accepts `py` in place of `python`. Setup fetches checksum-pinned engine and model files once (about 120 MB on Windows, 155 MB on Linux). Later launches open the board offline. To play White against the 3k Human SL profile with no display delay:
+
+```sh
+python scripts/play.py --color W --rank 3k --delay 0
+```
+
+Click an intersection to play. Pass with **Пас**. Press **F11** for the board and clocks alone. Click a clock or press **Esc** to return. New game starts a fresh position and cancels any pending reply. Clocks display time used by each side. Two passes end the game with KataGo's score estimate.
+
+![Desktop game in progress](docs/desktop-preview.png)
+
+[Отчёт первой игровой сборки](docs/FIRST_PLAY.ru.md) · [План](docs/PLAN.ru.md) · [Architecture](docs/ARCHITECTURE.md) · [Sources](docs/SOURCES.md) · [Validation](docs/VALIDATION.md)
 
 ## Quick start (Python 3.10+)
 
@@ -16,7 +37,7 @@ The demo samples synthetic policy probabilities only. It does not play a full ga
 python -m gomasters.engine --exe /path/to/katago --config /path/to/analysis_example.cfg --model /path/to/main.bin.gz --human-model /path/to/b18c384nbt-humanv0.bin.gz --rank 5k
 ```
 
-The command requests the empty 19x19 board and samples a legal move from humanPolicy. Full integration has not been run in the preparation environment. Use `--help` for more options.
+The command requests the empty 19x19 board and samples a legal move from humanPolicy. The one-shot JSON probe and the persistent GTP game client were both exercised with real models. Use `--help` for more options.
 
 ## Material acquisition (online once)
 
@@ -34,6 +55,12 @@ https://github.com/MurasakibaraTanuki/Go-game-agent-
 
 Clone this repository for local development. The repository is public; do not commit private game histories or materials without redistribution permission.
 
-## Status
+## SGF corpus
 
-Implemented: reference move-policy blending, deterministic synthetic demo, one-shot local engine probe, source retrieval script, unit tests, documentation. Planned: SGF ingestion, empirical style training, calibrated difficulty, playable desktop UI, native Android inference, device-specific board adapters. No real game records or model weights are bundled; network retrieval was unavailable during preparation.
+```sh
+python -m pip install -e ".[corpus]"
+python scripts/fetch_sources.py --get cwi-sgf --acknowledge-terms
+python scripts/index_sgf.py external/cwi-sgf.tgz external/cwi.sqlite
+```
+
+The index streams archive members, reads main lines, excludes handicap/setup and non-19×19 games, and rebuilds a local SQLite file atomically. Its report lists duplicates and skipped records. See the session report for the observed counts and limits of deduplication.

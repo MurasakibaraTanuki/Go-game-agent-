@@ -4,3 +4,6 @@
 
 ## Session checkpoint: 2026-11-27
 Initial 19 files committed on main (193671f0c153fef3baa4eba7fcfb74db22527443); key paths verified. GitHub Actions configured but run result not yet verified. User decisions: Pandanet-inspired UX; Masame candidate for technical base pending audit; maximum board + clocks Focus Mode (#1); phone-only local animated zoom with second-tap placement and optional auto zoom-out (#2); desktop direct click; physical electronic goban uses real stones; configurable human-like response time; short, evidence-based on-demand review explanations, 1–3 sentences, no additional language model required (#3). See PLAN.ru.md for the next session checklist. No trained profiles, complete UI, external archives, real engine test or hardware integration have been completed. Repository remains public.
+
+## First playable desktop session, 2026-11-27
+See [the implementation and validation report](FIRST_PLAY.ru.md) for the Masame decision, pinned assets, real offline game, window checks and CWI corpus index. The earlier preparation results above are historical.
