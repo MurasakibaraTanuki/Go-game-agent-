@@ -76,8 +76,12 @@ final class GameRecord {
     }
 
     /** FF[4] SGF: origin at top left, passes are empty, no invented result. */
-    String sgf() {
+    String sgf() { return sgf(null); }
+    String sgf(String result) {
+        if(result!=null&&!result.equals("B+R")&&!result.equals("W+R"))
+            throw new IllegalArgumentException("Unsupported result");
         StringBuilder out = new StringBuilder("(;GM[1]FF[4]CA[UTF-8]AP[Go Masters:0.1]SZ[19]RU[Chinese]KM[7.5]");
+        if(result!=null)out.append("RE[").append(result).append(']');
         for (int i = 0; i < moves.size(); i++) {
             int p = moves.get(i);
             out.append((i & 1) == 0 ? ";B[" : ";W[");
