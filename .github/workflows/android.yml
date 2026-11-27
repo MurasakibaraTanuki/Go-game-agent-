@@ -1,0 +1,54 @@
+name: Android APK
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'android/**'
+      - 'configs/gtp-cpu.cfg'
+      - '.github/workflows/android.yml'
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      MASAME_REV: 1915ecad68b0c8648fcd1b4b28228464d8454863
+      NDK_VERSION: 27.2.12479018
+      CMAKE_BUILD_PARALLEL_LEVEL: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check out the pinned native engine recipe and notices
+        uses: actions/checkout@v4
+        with:
+          repository: Slymaster/masame
+          ref: ${{ env.MASAME_REV }}
+          path: external/masame
+          persist-credentials: false
+      - uses: actions/cache@v4
+        id: engine
+        with:
+          path: external/native/katago-android/arm64-v8a/libkatago.so
+          key: katago-arm64-eigen-${{ env.MASAME_REV }}-${{ env.NDK_VERSION }}
+      - name: Build the ARM64 KataGo executable
+        if: steps.engine.outputs.cache-hit != 'true'
+        run: |
+          export ANDROID_NDK="$ANDROID_HOME/ndk/$NDK_VERSION"
+          if [ ! -f "$ANDROID_NDK/source.properties" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;$NDK_VERSION"
+          fi
+          export MASAME_VENDOR="$PWD/external/native"
+          bash external/masame/scripts/build-katago-android.sh
+      - name: Assemble and verify the offline APK
+        if: hashFiles('android/build.sh') != ''
+        run: bash android/build.sh
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('android/out/GoMasters-Android-arm64.apk') != ''
+        with:
+          name: GoMasters-Android-arm64
+          path: |
+            android/out/GoMasters-Android-arm64.apk
+            android/out/SHA256SUMS
+          if-no-files-found: error
