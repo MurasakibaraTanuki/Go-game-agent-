@@ -28,7 +28,7 @@ public final class MainActivity extends Activity {
     private String rank;
     private static final int EXPORT_SGF = 41;
     private String pendingSgf;
-    private boolean gameOver;
+    private boolean gameOver, resigned;
     private PositionAnalysis analysis;
     private final Runnable ticker = new Runnable() {
         public void run() { renderTime(); ui.postDelayed(this, 250); }
@@ -56,6 +56,7 @@ public final class MainActivity extends Activity {
         setFocus();
         rank=prefs.getString("rank","5k"); botWhite=prefs.getBoolean("botWhite",true);
         elapsed[0]=prefs.getLong("blackMs",0); elapsed[1]=prefs.getLong("whiteMs",0);
+        resigned=prefs.getBoolean("resigned",false);
         String history=prefs.getString("history","");
         if(!history.isEmpty()) for(String p:history.split(",")) moves.add(Integer.parseInt(p));
         start();
@@ -97,7 +98,7 @@ public final class MainActivity extends Activity {
         StringBuilder history=new StringBuilder();
         for(int move:moves) { if(history.length()>0)history.append(','); history.append(move); }
         prefs.edit().putString("history",history.toString()).putString("rank",rank)
-            .putBoolean("botWhite",botWhite).putLong("blackMs",elapsed[0]).putLong("whiteMs",elapsed[1]).apply();
+            .putBoolean("botWhite",botWhite).putBoolean("resigned",resigned).putLong("blackMs",elapsed[0]).putLong("whiteMs",elapsed[1]).apply();
     }
 
     private File asset(String name) throws IOException {
@@ -136,6 +137,16 @@ public final class MainActivity extends Activity {
         stopEngine(); int id=epoch;
         board.active=false; board.moveCount=0; board.last=-1; board.resetCamera(); Arrays.fill(board.stones,'.');
         turnClock(-1); message("Загрузка KataGo…");
+        if(resigned) {
+            try {
+                GameRecord record=new GameRecord(moves);
+                board.stones=record.position(record.size());
+                board.moveCount=record.size();board.last=record.last(record.size());
+                board.describe();board.invalidate();
+                finishResignation();
+            } catch(IllegalArgumentException ex) {message("Ошибка записи: "+ex.getMessage());}
+            return;
+        }
         final ArrayList<Integer> previous=new ArrayList<>(moves);
         final String selectedRank=rank;
         worker.execute(()->{
@@ -205,8 +216,24 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private void finishResignation() {
+        resigned=true;gameOver=true;
+        stopEngine();board.active=false;board.resetCamera();turnClock(-1);
+        if(focus){focus=false;setFocus();}
+        message("Партия завершена: вы сдались");save();
+    }
+
+    private void resignDialog() {
+        if(!board.active||!humanTurn()||gameOver)return;
+        new AlertDialog.Builder(this).setTitle("Сдаться?")
+            .setMessage("Партия завершится. После этого можно разобрать ходы.")
+            .setNegativeButton("Отмена",null).setPositiveButton("Сдаться",(d,w)->{
+                if(board.active&&humanTurn()&&!gameOver)finishResignation();
+            }).show();
+    }
+
     private void menu() {
-        String[] items={"Пас","Новая партия","Ввод и отображение",focus?"Выйти из фокуса":"Режим фокуса","Отменить выбор / вся доска","Просмотр партии / SGF"};
+        String[] items={"Пас","Новая партия","Ввод и отображение",focus?"Выйти из фокуса":"Режим фокуса","Отменить выбор / вся доска","Просмотр партии / SGF","Сдаться"};
         new AlertDialog.Builder(this).setItems(items,(dialog,i)->{
             if(i==0) human(361);
             if(i==1) newGameDialog();
@@ -214,6 +241,7 @@ public final class MainActivity extends Activity {
             if(i==3) {focus=!focus; prefs.edit().putBoolean("focus",focus).apply();setFocus();}
             if(i==4) board.cancelSelection();
             if(i==5) review();
+            if(i==6) resignDialog();
         }).show();
     }
     private void review() {
@@ -264,7 +292,8 @@ public final class MainActivity extends Activity {
         next.setOnClickListener(v->slider.setProgress(Math.min(record.size(),slider.getProgress()+1)));
         last.setOnClickListener(v->slider.setProgress(record.size()));
         coach.setOnClickListener(v->coach(record,slider.getProgress()));
-        export.setOnClickListener(v->exportSgf(record.sgf()));
+        final String resignationResult=resigned?(botWhite?"W+R":"B+R"):null;
+        export.setOnClickListener(v->exportSgf(record.sgf(resignationResult)));
         close.setOnClickListener(v->dialog.dismiss());
         slider.setProgress(record.size()); show.accept(record.size());
         dialog.setContentView(root); dialog.show();
@@ -448,7 +477,7 @@ public final class MainActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("Новая партия · ранг бота").setView(box)
             .setNegativeButton("Отмена",null).setPositiveButton("Начать",(d,w)->{
                 turnClock(-1); rank=(String)levels.getSelectedItem();botWhite=!white.isChecked();
-                moves.clear();Arrays.fill(elapsed,0);save();start();
+                resigned=false;moves.clear();Arrays.fill(elapsed,0);save();start();
             }).show();
     }
     @Override public void onBackPressed() {
