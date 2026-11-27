@@ -14,6 +14,8 @@ final class Goban extends View {
     boolean active, precision = true, autoOut = true;
     int last = -1, selected = -1, moveCount;
     int recommendation=-1, playedSuggestion=-1;
+    double[] ownership;
+    BoardInsights.Atari atari;
     void describe() {
         String desc="Доска го, 19 на 19. Ходов: "+moveCount+".";
         if(last>=0) desc+=" Последний ход: "+GoEngine.vertex(last)+".";
@@ -71,6 +73,18 @@ final class Goban extends View {
                 pen.setColor(0x994b6255);
                 c.drawCircle(x,y,.43f*d,pen); ring(c,x,y,.19f*d,0xfffcf3da);
             }
+        }
+        if(ownership!=null)for(int p=0;p<361;p++) {
+            int color=BoardInsights.ownershipColor(ownership[p]);
+            if(color==0)continue;
+            float x=edge+p%19*d,y=edge+p/19*d;
+            pen.setColor(color);
+            c.drawRect(x-.19f*d,y-.19f*d,x+.19f*d,y+.19f*d,pen);
+        }
+        if(atari!=null)for(int p=0;p<361;p++) {
+            float x=edge+p%19*d,y=edge+p/19*d;
+            if(atari.stones[p])ring(c,x,y,.43f*d,0xfff07818);
+            if(atari.liberties[p])ring(c,x,y,.22f*d,0xffffd228);
         }
         if(playedSuggestion>=0 && playedSuggestion<361 && stones[playedSuggestion]=='.')
             ring(c,edge+playedSuggestion%19*d,edge+playedSuggestion/19*d,.30f*d,0xff1857c7);
