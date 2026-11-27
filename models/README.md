@@ -1,0 +1,1 @@
+Store downloaded standard KataGo and Human SL networks separately, along with engine config and model manifest. No weights bundled. Profiles are trained on desktop and exported as versioned small JSON packs after validation. Check model-specific license and SHA-256 before distribution.

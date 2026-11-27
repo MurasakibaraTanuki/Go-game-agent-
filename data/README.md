@@ -1,0 +1,1 @@
+Place lawful SGF files in a local data/raw directory. This folder intentionally contains no external games. Record source IDs and hashes; use normalized derived datasets only after license audit. Never commit personal games or restricted source records by default.

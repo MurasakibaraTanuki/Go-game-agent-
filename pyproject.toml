@@ -1,0 +1,10 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "go-masters-ai"
+version = "0.0.1"
+requires-python = ">=3.10"
+description = "Offline Go style and strength research prototype"
+[tool.setuptools.packages.find]
+where = ["src"]

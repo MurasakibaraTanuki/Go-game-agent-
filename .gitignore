@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+external/
+data/*
+!data/README.md
+models/*
+!models/README.md
+build/
+dist/
+*.apk
+*.bin.gz
+.env
