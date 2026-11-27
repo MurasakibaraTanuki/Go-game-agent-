@@ -69,7 +69,7 @@ final class GameRecord {
 
     /** FF[4] SGF: origin at top left, passes are empty, no invented result. */
     String sgf() {
-        StringBuilder out = new StringBuilder("(;GM[1]FF[4]CA[UTF-8]AP[Go Masters]SZ[19]RU[Chinese]KM[7.5]");
+        StringBuilder out = new StringBuilder("(;GM[1]FF[4]CA[UTF-8]AP[Go Masters:0.1]SZ[19]RU[Chinese]KM[7.5]");
         for (int i = 0; i < moves.size(); i++) {
             int p = moves.get(i);
             out.append((i & 1) == 0 ? ";B[" : ";W[");
