@@ -1,0 +1,71 @@
+plugins {
+    id 'com.android.application'
+}
+
+def offline = rootProject.file('external/android-studio')
+def generatedAssets = layout.buildDirectory.dir('generated/offline-assets')
+def models = [
+    'kata1-b10c128-s1141046784-d204142634.txt.gz',
+    'b18c384nbt-humanv0.bin.gz'
+]
+def engines = ['arm64-v8a', 'x86_64'].collect { "lib/$it/libkatago.so" }
+
+android {
+    namespace = 'org.gomasters.mobile'
+    compileSdk = 37
+
+    defaultConfig {
+        applicationId = 'org.gomasters.mobile'
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 1
+        versionName = '0.1'
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            assets.srcDir generatedAssets.get().asFile
+            jniLibs.srcDirs = [new File(offline, 'lib')]
+        }
+    }
+
+    androidResources {
+        noCompress += 'model'
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            keepDebugSymbols += '**/libkatago.so'
+        }
+    }
+}
+
+def prepareOfflineAssets = tasks.register('prepareOfflineAssets', Sync) {
+    into generatedAssets
+    from(new File(offline, 'assets')) {
+        rename(/(.+\.gz)/, '$1.model')
+    }
+    from('analysis.cfg')
+    from(rootProject.file('configs/gtp-cpu.cfg')) {
+        rename { 'game.cfg' }
+    }
+    inputs.files(engines.collect { new File(offline, it) })
+    doFirst {
+        def missing = (models.collect { "assets/$it" } + engines).findAll {
+            !new File(offline, it).isFile()
+        }
+        if (!missing.empty) {
+            throw new GradleException(
+                "Missing offline files: ${missing.join(', ')}. " +
+                'Run python android/prepare_studio.py <APK> <SHA256SUMS> from the repository root.'
+            )
+        }
+    }
+}
+
+tasks.named('preBuild') {
+    dependsOn prepareOfflineAssets
+}

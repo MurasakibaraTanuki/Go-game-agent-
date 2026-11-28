@@ -2,8 +2,11 @@ package org.gomasters.mobile;
 
 import android.app.*;
 import android.content.*;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.os.*;
 import android.view.*;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.*;
 import java.io.*;
 import java.nio.file.*;
@@ -20,7 +23,8 @@ public final class MainActivity extends Activity {
     private volatile int epoch;
     private GoEngine engine;
     private Goban board;
-    private TextView clock, status;
+    private GameClock clock;
+    private TextView status;
     private SharedPreferences prefs;
     private boolean focus, foreground, botWhite;
     private int ticking = -1;
@@ -41,7 +45,7 @@ public final class MainActivity extends Activity {
         LinearLayout layout=new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setBackgroundColor(0xff21221e);
-        clock=new TextView(this); clock.setGravity(Gravity.CENTER); clock.setTextSize(20);
+        clock=new GameClock(this); clock.setGravity(Gravity.CENTER); clock.setTextSize(20);
         clock.setMinHeight(dp(48)); clock.setOnClickListener(v->menu());
         clock.setContentDescription("Часы и меню партии");
         layout.addView(clock);
@@ -77,9 +81,34 @@ public final class MainActivity extends Activity {
 
     private void renderTime() {
         long now=SystemClock.elapsedRealtime();
-        clock.setText("●  "+format(elapsed[0]+(foreground&&ticking==0?now-since:0))+
+        clock.showTime("●  "+format(elapsed[0]+(foreground&&ticking==0?now-since:0))+
                 "       ○  "+format(elapsed[1]+(foreground&&ticking==1?now-since:0)));
     }
+
+    private static final class GameClock extends TextView {
+        private String time = "";
+
+        GameClock(Context context) { super(context); }
+
+        void showTime(String value) {
+            if (value.equals(time)) return;
+            time = value;
+            // Redraw the stopwatch without broadcasting a text change every second.
+            invalidate();
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            Paint paint = getPaint();
+            paint.setColor(getCurrentTextColor());
+            canvas.drawText(time, (getWidth() - paint.measureText(time)) / 2f, getBaseline(), paint);
+        }
+
+        @Override public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+            super.onInitializeAccessibilityNodeInfo(info);
+            info.setText(time);
+        }
+    }
+
     private static String format(long ms) {
         long sec=ms/1000; return String.format(Locale.ROOT,"%02d:%02d",sec/60,sec%60);
     }
@@ -106,7 +135,9 @@ public final class MainActivity extends Activity {
         if(!name.endsWith(".cfg") && dest.isFile() && dest.length()>0) return dest;
         File tmp=File.createTempFile("asset-", ".part",getFilesDir());
         try {
-            try(InputStream in=getAssets().open(name); OutputStream out=new FileOutputStream(tmp)) {
+            // Android packaging expands assets with a .gz suffix.
+            String bundledName = name.endsWith(".gz") ? name + ".model" : name;
+            try(InputStream in=getAssets().open(bundledName); OutputStream out=new FileOutputStream(tmp)) {
                 byte[] buf=new byte[65536]; int count;
                 while((count=in.read(buf))!=-1) out.write(buf,0,count);
             }

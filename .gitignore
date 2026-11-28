@@ -13,3 +13,7 @@ dist/
 *.bin.gz
 .env
 android/out/
+.gradle/
+.idea/
+*.iml
+local.properties

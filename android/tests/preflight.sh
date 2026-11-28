@@ -12,7 +12,7 @@ javac -encoding UTF-8 --release 8 -d "$work/tests" \
 for test in GameRecordTest CoachTextTest BoardInsightsTest; do
   java -cp "$work/tests" "org.gomasters.mobile.$test"
 done
-python3 -m py_compile android/tests/device.py
+python3 -m py_compile android/prepare_studio.py android/verify_apk.py android/tests/device.py
 bash -n android/build.sh android/native-x86.sh
 sdk=${ANDROID_HOME:?Set ANDROID_HOME}
 platform="$sdk/platforms/android-35/android.jar"

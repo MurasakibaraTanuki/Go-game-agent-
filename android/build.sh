@@ -25,8 +25,10 @@ javac -encoding UTF-8 --release 8 -d "$work/tests" \
   android/src/org/gomasters/mobile/BoardInsights.java android/tests/BoardInsightsTest.java
 java -cp "$work/tests" org.gomasters.mobile.BoardInsightsTest
 cp external/native/katago-android/arm64-v8a/libkatago.so "$work/lib/arm64-v8a/"
+verify_args=()
 if [[ -f external/native/katago-android/x86_64/libkatago.so ]]; then
   mkdir -p "$work/lib/x86_64"; cp external/native/katago-android/x86_64/libkatago.so "$work/lib/x86_64/"
+  verify_args+=(--require-x86-64)
 fi
 # Use the same published URLs and hashes as the verified desktop pair.
 python3 - "$work/assets" <<'PY'
@@ -38,7 +40,7 @@ import play
 play.CACHE.mkdir(exist_ok=True, parents=True)
 for spec in play.MODELS:
     source = play.fetch(*spec)
-    copyfile(source, Path(sys.argv[1]) / source.name)
+    copyfile(source, Path(sys.argv[1]) / (source.name + ".model"))
 PY
 cp configs/gtp-cpu.cfg "$work/assets/game.cfg"
 cp android/analysis.cfg "$work/assets/analysis.cfg"
@@ -46,7 +48,8 @@ cp android/licenses/* "$work/assets/notices/"
 cp external/masame/src-tauri/resources/licenses/katago/* "$work/assets/notices/"
 cp external/masame/src-tauri/resources/licenses/linux-engine/eigen-MPL-2.0.txt "$work/assets/notices/"
 cp "$ANDROID_HOME/ndk/27.2.12479018/NOTICE" "$work/assets/notices/Android-NDK-NOTICE.txt"
-"$tools/aapt2" link -o "$work/base.apk" -I "$platform" --manifest android/AndroidManifest.xml -A "$work/assets" -0 gz
+"$tools/aapt2" link -o "$work/base.apk" -I "$platform" --manifest android/AndroidManifest.xml \
+  --min-sdk-version 26 --target-sdk-version 34 -A "$work/assets" -0 model
 javac -encoding UTF-8 --release 8 -cp "$platform" -d "$work/classes" android/src/org/gomasters/mobile/*.java
 jar cf "$work/classes.jar" -C "$work/classes" .
 "$tools/d8" --min-api 26 --lib "$platform" --output "$work/dex" "$work/classes.jar"
@@ -63,5 +66,6 @@ apk="$out/GoMasters-Android.apk"
 "$tools/apksigner" sign --ks "$key" --ks-pass pass:android --ks-key-alias androiddebugkey --out "$apk" "$work/aligned.apk"
 "$tools/apksigner" verify --verbose "$apk"
 "$tools/zipalign" -c -P 16 4 "$apk"
+python3 android/verify_apk.py "$apk" "${verify_args[@]}"
 "$tools/aapt2" dump badging "$apk" | head -30
 (cd "$out" && sha256sum GoMasters-Android.apk > SHA256SUMS)
